@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskCampusIdea | Gestión Académica</title>
+    <style>
+        :root {
+            --primary: #0052cc;
+            --success: #36b37e;
+            --danger: #ff5630;
+            --warning: #ffab00;
+            --bg: #f4f5f7;
+            --text: #172b4d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding-top: 50px;
+        }
+
+        .container {
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .hidden { display: none !important; }
+
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .task-item {
+            background: #fff;
+            border-left: 6px solid var(--primary);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        .task-item.completed {
+            border-left-color: var(--success);
+            opacity: 0.7;
+        }
+
+        .task-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="container">
+        <h1 style="text-align: center;">🎒 TaskCampusIdea</h1>
+        <p style="text-align: center;">Plataforma de gestión para estudiantes</p>
+        <div style="margin-top: 30px;">
+            <label>Usuario / Estudiante:</label>
+            <input type="text" id="username" placeholder="Ingresa tu nombre de usuario...">
+            <button class="btn-primary" style="width: 100%;" onclick="app.login()">Entrar al Panel</button>
+        </div>
+    </div>
+
+    <div id="main-app" class="container hidden">
+        <header>
+            <h2 id="user-display"></h2>
+            <button class="btn-danger" onclick="app.logout()">Cerrar Sesión (TAS-6)</button>
+        </header>
+
+        <div id="task-form-container">
+            <h3 id="form-title">📝 Crear Nueva Tarea</h3>
+            <input type="hidden" id="edit-id">
+            <input type="text" id="task-title" placeholder="¿Qué tienes que hacer?">
+            <textarea id="task-desc" placeholder="Detalles de la tarea (opcional)"></textarea>
+            <label>Fecha de Entrega:</label>
+            <input type="date" id="task-date">
+            <button class="btn-success" id="btn-save" onclick="app.saveTask()">Guardar Tarea</button>
+            <button class="btn-danger hidden" id="btn-cancel" onclick="app.clearForm()">Cancelar Edición</button>
+        </div>
+
+        <hr style="margin: 30px 0;">
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>📋 Mis Pendientes</h3>
+            <button onclick="app.sortByDate()" style="background: #eee; color: #333; font-size: 12px;">
+                Ordenar por Fecha (TAS-14)
+            </button>
+        </div>
+        
+        <div id="task-list">
+            </div>
+    </div>
+
+    <script>
+        const app = {
+            user: null,
+            tasks: JSON.parse(localStorage.getItem('campus_data')) || [],
+
+            login: function() {
+                const name = document.getElementById('username').value.trim();
+                if(!name) return alert("Ingresa un usuario");
+                this.user = name;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('user-display').innerText = "Hola, " + this.user;
+                this.render();
+            },
+
+            logout: function() { // TAS-6
+                this.user = null;
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+            },
+
+            saveTask: function() { // TAS-7 y TAS-10
+                const title = document.getElementById('task-title').value;
+                const desc = document.getElementById('task-desc').value;
+                const date = document.getElementById('task-date').value;
+                const editId = document.getElementById('edit-id').value;
+
+                if(!title || !date) return alert("Título y Fecha son obligatorios (TAS-17)");
+
+                if(editId) {
+                    const idx = this.tasks.findIndex(t => t.id == editId);
+                    this.tasks[idx] = {...this.tasks[idx], title, desc, date};
+                } else {
+                    this.tasks.push({
+                        id: Date.now(),
+                        user: this.user,
+                        title, desc, date,
+                        completed: false
+                    });
+                }
+
+                this.sync();
+                this.clearForm();
+                this.render();
+            },
+
+            deleteTask: function(id) { // TAS-11
+                if(confirm("¿Seguro que quieres eliminar esta tarea?")) {
+                    this.tasks = this.tasks.filter(t => t.id !== id);
+                    this.sync();
+                    this.render();
+                }
+            },
+
+            toggleTask: function(id) { // TAS-9
+                const idx = this.tasks.findIndex(t => t.id == id);
+                this.tasks[idx].completed = !this.tasks[idx].completed;
+                this.sync();
+                this.render();
+            },
+
+            editTask: function(id) { // TAS-10
+                const task = this.tasks.find(t => t.id == id);
+                document.getElementById('task-title').value = task.title;
+                document.getElementById('task-desc').value = task.desc;
+                document.getElementById('task-date').value = task.date;
+                document.getElementById('edit-id').value = task.id;
+                document.getElementById('form-title').innerText = "✏️ Editando Tarea";
+                document.getElementById('btn-cancel').classList.remove('hidden');
+            },
+
+            sortByDate: function() { // TAS-14
+                this.tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+                this.render();
+            },
+
+            clearForm: function() {
+                document.getElementById('task-title').value = "";
+                document.getElementById('task-desc').value = "";
+                document.getElementById('task-date').value = "";
+                document.getElementById('edit-id').value = "";
+                document.getElementById('form-title').innerText = "📝 Crear Nueva Tarea";
+                document.getElementById('btn-cancel').classList.add('hidden');
+            },
+
+            sync: function() {
+                localStorage.setItem('campus_data', JSON.stringify(this.tasks));
+            },
+
+            render: function() { // TAS-8
+                const list = document.getElementById('task-list');
+                list.innerHTML = "";
+                const myTasks = this.tasks.filter(t => t.user === this.user);
+
+                if(myTasks.length === 0) list.innerHTML = "<p>No tienes tareas creadas.</p>";
+
+                myTasks.forEach(t => {
+                    const div = document.createElement('div');
+                    div.className = `task-item ${t.completed ? 'completed' : ''}`;
+                    div.innerHTML = `
+                        <strong>${t.title}</strong>
+                        <p>${t.desc}</p>
+                        <small>📅 Entrega: ${t.date}</small>
+                        <div class="task-actions">
+                            <button class="btn-success" onclick="app.toggleTask(${t.id})">${t.completed ? 'Desmarcar' : 'Completar'}</button>
+                            <button class="btn-primary" onclick="app.editTask(${t.id})">Editar</button>
+                            <button class="btn-danger" onclick="app.deleteTask(${t.id})">Eliminar</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        };
+    </script>
+</body>
+</html>
