@@ -99,14 +99,19 @@
         <div style="margin-top: 30px;">
             <label>Usuario / Estudiante:</label>
             <input type="text" id="username" placeholder="Ingresa tu nombre de usuario...">
-            <button class="btn-primary" style="width: 100%;" onclick="app.login()">Entrar al Panel</button>
+            
+            <label>Contraseña:</label>
+            <input type="password" id="password" placeholder="Ingresa tu contraseña...">
+            
+            <button class="btn-primary" style="width: 100%; margin-top: 15px;" onclick="app.login()">Entrar / Registrarse</button>
+            <p style="font-size: 12px; text-align: center; color: #666;">Si el usuario no existe, se registrará automáticamente con la contraseña ingresada.</p>
         </div>
     </div>
 
     <div id="main-app" class="container hidden">
         <header>
             <h2 id="user-display"></h2>
-            <button class="btn-danger" onclick="app.logout()">Cerrar Sesión (TAS-6)</button>
+            <button class="btn-danger" onclick="app.logout()">Cerrar Sesión</button>
         </header>
 
         <div id="task-form-container">
@@ -125,42 +130,68 @@
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>📋 Mis Pendientes</h3>
             <button onclick="app.sortByDate()" style="background: #eee; color: #333; font-size: 12px;">
-                Ordenar por Fecha (TAS-14)
+                Ordenar por Fecha
             </button>
         </div>
         
-        <div id="task-list">
-            </div>
+        <div id="task-list"></div>
     </div>
 
     <script>
         const app = {
             user: null,
-            tasks: JSON.parse(localStorage.getItem('campus_data')) || [],
+            // Guardamos tareas y usuarios por separado
+            tasks: JSON.parse(localStorage.getItem('campus_tasks')) || [],
+            usersDB: JSON.parse(localStorage.getItem('campus_users')) || [],
 
             login: function() {
                 const name = document.getElementById('username').value.trim();
-                if(!name) return alert("Ingresa un usuario");
+                const pass = document.getElementById('password').value.trim();
+                
+                if(!name || !pass) return alert("Por favor, ingresa usuario y contraseña.");
+
+                // Buscamos si el usuario ya existe
+                const existingUser = this.usersDB.find(u => u.username === name);
+
+                if (existingUser) {
+                    // Si existe, verificamos la contraseña
+                    if (existingUser.password !== pass) {
+                        return alert("❌ Contraseña incorrecta. Intenta de nuevo.");
+                    }
+                    alert("✅ Inicio de sesión exitoso. ¡Bienvenido de nuevo!");
+                } else {
+                    // Si no existe, lo registramos
+                    this.usersDB.push({ username: name, password: pass });
+                    localStorage.setItem('campus_users', JSON.stringify(this.usersDB));
+                    alert("🎉 Usuario nuevo registrado con éxito.");
+                }
+
+                // Dar acceso al panel
                 this.user = name;
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
                 document.getElementById('user-display').innerText = "Hola, " + this.user;
+                
+                // Limpiar los campos para la próxima vez
+                document.getElementById('username').value = "";
+                document.getElementById('password').value = "";
+                
                 this.render();
             },
 
-            logout: function() { // TAS-6
+            logout: function() { 
                 this.user = null;
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('main-app').classList.add('hidden');
             },
 
-            saveTask: function() { // TAS-7 y TAS-10
+            saveTask: function() { 
                 const title = document.getElementById('task-title').value;
                 const desc = document.getElementById('task-desc').value;
                 const date = document.getElementById('task-date').value;
                 const editId = document.getElementById('edit-id').value;
 
-                if(!title || !date) return alert("Título y Fecha son obligatorios (TAS-17)");
+                if(!title || !date) return alert("El título y la fecha son obligatorios.");
 
                 if(editId) {
                     const idx = this.tasks.findIndex(t => t.id == editId);
@@ -174,27 +205,27 @@
                     });
                 }
 
-                this.sync();
+                this.syncTasks();
                 this.clearForm();
                 this.render();
             },
 
-            deleteTask: function(id) { // TAS-11
+            deleteTask: function(id) { 
                 if(confirm("¿Seguro que quieres eliminar esta tarea?")) {
                     this.tasks = this.tasks.filter(t => t.id !== id);
-                    this.sync();
+                    this.syncTasks();
                     this.render();
                 }
             },
 
-            toggleTask: function(id) { // TAS-9
+            toggleTask: function(id) { 
                 const idx = this.tasks.findIndex(t => t.id == id);
                 this.tasks[idx].completed = !this.tasks[idx].completed;
-                this.sync();
+                this.syncTasks();
                 this.render();
             },
 
-            editTask: function(id) { // TAS-10
+            editTask: function(id) { 
                 const task = this.tasks.find(t => t.id == id);
                 document.getElementById('task-title').value = task.title;
                 document.getElementById('task-desc').value = task.desc;
@@ -204,7 +235,7 @@
                 document.getElementById('btn-cancel').classList.remove('hidden');
             },
 
-            sortByDate: function() { // TAS-14
+            sortByDate: function() { 
                 this.tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
                 this.render();
             },
@@ -218,11 +249,11 @@
                 document.getElementById('btn-cancel').classList.add('hidden');
             },
 
-            sync: function() {
-                localStorage.setItem('campus_data', JSON.stringify(this.tasks));
+            syncTasks: function() {
+                localStorage.setItem('campus_tasks', JSON.stringify(this.tasks));
             },
 
-            render: function() { // TAS-8
+            render: function() { 
                 const list = document.getElementById('task-list');
                 list.innerHTML = "";
                 const myTasks = this.tasks.filter(t => t.user === this.user);
